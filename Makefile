@@ -80,28 +80,30 @@ llvm-build: llvm-build/build.ninja
 build/tinygo:
 	@if [ ! -f llvm-build/bin/llvm-config ]; then echo "Fetch and build LLVM first by running:\n  make llvm-source\n  make llvm-build"; exit 1; fi
 	CGO_CPPFLAGS="$(CGO_CPPFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go build -o build/tinygo -tags byollvm .
+build/lib/clang/include/stdint.h:
+	@mkdir -p build/lib/clang/include
+	cp -p $(abspath $(CLANG_SRC))/lib/Headers/*.h build/lib/clang/include
 
-test:
+test: build/lib/clang/include/stdint.h
 	CGO_CPPFLAGS="$(CGO_CPPFLAGS)" CGO_CXXFLAGS="$(CGO_CXXFLAGS)" CGO_LDFLAGS="$(CGO_LDFLAGS)" go test -v -tags byollvm .
 
-release: build/tinygo gen-device
-	@mkdir -p build/release/tinygo/bin
-	@mkdir -p build/release/tinygo/lib/CMSIS/CMSIS
-	@mkdir -p build/release/tinygo/lib/compiler-rt/lib
-	@mkdir -p build/release/tinygo/lib/nrfx
-	@mkdir -p build/release/tinygo/pkg/armv6m-none-eabi
-	@mkdir -p build/release/tinygo/pkg/armv7m-none-eabi
-	@mkdir -p build/release/tinygo/pkg/armv7em-none-eabi
-	@cp -p  build/tinygo                 build/release/tinygo/bin
-	@cp -rp lib/CMSIS/CMSIS/Include      build/release/tinygo/lib/CMSIS/CMSIS
-	@cp -rp lib/CMSIS/README.md          build/release/tinygo/lib/CMSIS
-	@cp -rp lib/compiler-rt/lib/builtins build/release/tinygo/lib/compiler-rt/lib
-	@cp -rp lib/compiler-rt/LICENSE.TXT  build/release/tinygo/lib/compiler-rt
-	@cp -rp lib/compiler-rt/README.txt   build/release/tinygo/lib/compiler-rt
-	@cp -rp lib/nrfx/*                   build/release/tinygo/lib/nrfx
-	@cp -rp src                          build/release/tinygo/src
-	@cp -rp targets                      build/release/tinygo/targets
-	./build/tinygo build-builtins -target=armv6m-none-eabi  -o build/release/tinygo/pkg/armv6m-none-eabi/compiler-rt.a
-	./build/tinygo build-builtins -target=armv7m-none-eabi  -o build/release/tinygo/pkg/armv7m-none-eabi/compiler-rt.a
-	./build/tinygo build-builtins -target=armv7em-none-eabi -o build/release/tinygo/pkg/armv7em-none-eabi/compiler-rt.a
-	tar -czf build/release.tar.gz -C build/release tinygo
+release: build/tinygo build/lib/clang/include/stdint.h gen-device
+	@mkdir -p build/lib/CMSIS/CMSIS
+	@mkdir -p build/lib/compiler-rt/lib
+	@mkdir -p build/lib/nrfx
+	@mkdir -p build/pkg/armv6m-none-eabi
+	@mkdir -p build/pkg/armv7m-none-eabi
+	@mkdir -p build/pkg/armv7em-none-eabi
+	@echo copying source files
+	@cp -rp lib/CMSIS/CMSIS/Include      build/lib/CMSIS/CMSIS
+	@cp -rp lib/CMSIS/README.md          build/lib/CMSIS
+	@cp -rp lib/compiler-rt/lib/builtins build/lib/compiler-rt/lib
+	@cp -rp lib/compiler-rt/LICENSE.TXT  build/lib/compiler-rt
+	@cp -rp lib/compiler-rt/README.txt   build/lib/compiler-rt
+	@cp -rp lib/nrfx/*                   build/lib/nrfx
+	@cp -rp src                          build/src
+	@cp -rp targets                      build/targets
+	./build/tinygo build-builtins -target=armv6m-none-eabi  -o build/pkg/armv6m-none-eabi/compiler-rt.a
+	./build/tinygo build-builtins -target=armv7m-none-eabi  -o build/pkg/armv7m-none-eabi/compiler-rt.a
+	./build/tinygo build-builtins -target=armv7em-none-eabi -o build/pkg/armv7em-none-eabi/compiler-rt.a
+	tar --transform s/^build/tinygo/ -czf release.tar.gz build
